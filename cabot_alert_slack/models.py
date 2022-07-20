@@ -86,6 +86,13 @@ class SlackAlert(AlertPlugin):
 
     def _email_to_slack_user_id(self, url, headers, email):
         # type: (str, Dict[str, str], str) -> str
+        """
+        Look up a Slack user ID by email. Raises SlackAPIError if the user can't be found.
+        :param url: slack api endpoint
+        :param headers: auth headers
+        :param email: email to look up
+        :return: slack user ID
+        """
         response = requests.get(urljoin(url, 'users.lookupByEmail'), headers=headers, params={
             'email': email
         })
@@ -94,7 +101,13 @@ class SlackAlert(AlertPlugin):
 
     def _cabot_user_to_slack_user_id(self, url, headers, user):
         # type: (str, Dict[str, str], User) -> str
-
+        """
+        Map a Cabot user to their Slack user ID. Raises SlackAPIError if the user's email can't be found in Slack.
+        :param url: slack api url
+        :param headers: auth headers
+        :param user: Cabot user
+        :return: slack user ID
+        """
         # check for user ID override
         # note some users might not have SlackAlertUserData objects created yet, so this may be empty list
         for slack_data in SlackAlertUserData.objects.filter(user__user=user):
@@ -104,6 +117,13 @@ class SlackAlert(AlertPlugin):
 
     def _get_channel_members(self, url, headers, channel_id):
         # type: (str, Dict[str, str], str) -> Set[str]
+        """
+        Get a list of user IDs who are in a channel.
+        :param url: slack api url
+        :param headers: auth headers
+        :param channel_id: slack channel ID to get users from
+        :return: set of user ID strings
+        """
 
         params = {
             'channel': channel_id,
@@ -130,9 +150,10 @@ class SlackAlert(AlertPlugin):
         _check_response(response)
 
     def _ensure_channel_members(self, url, headers, channel_id, user_ids):
+        # type: (str, Dict[str, str], str, List[str]) -> None
         """
         Adds the given list of user IDs to the given channel_id.
-        Raises an exception if some users could not be invited to the channel.
+        Raises a SlackAPIError if some users could not be invited to the channel.
         :param url: slack api endpoint
         :param headers: HTTP headers (w/ access token)
         :param channel_id: channel ID to add users to
@@ -152,14 +173,15 @@ class SlackAlert(AlertPlugin):
         _check_response(response)
 
     def _upload_file(self, url, headers, file_name, file_data, channel_id, thread_ts, timeout_seconds=30):
+        # type: (str, Dict[str, str], str, bytes, str, str, int) -> Dict[str, str]
         """
-        Upload a list of files to MM.
-        :param url: MM api v4 endpoint
-        :param headers: HTTP headers (w/ api token)
+        Upload a file to slack.
+        :param url: slack api endpoint
+        :param headers: HTTP headers (w/ access token)
         :param file_name: file name
         :param file_data: file contents (bytes)
-        :param channel_id: channel ID
-        :param thread_ts: parent thread id to post to
+        :param channel_id: channel ID to share with
+        :param thread_ts: parent thread id to post the file as a reply to
         :param timeout_seconds: timeout for uploading all files (default 30s)
         :return: a slack file object (dict from json)
         """
@@ -175,6 +197,15 @@ class SlackAlert(AlertPlugin):
 
     def _post_message(self, url, headers, text, blocks, channel_id):
         # type: (str, Dict[str, str], str, List[Any], str) -> str
+        """
+        Post a message to a channel. Note the Cabot integration should be in the channel for this to work.
+        :param url: slack api endpoint
+        :param headers: auth headers
+        :param text: message text (used as fallback/notification text if blocks is specified)
+        :param blocks: slack block layout data
+        :param channel_id: channel to post to
+        :return: the post's "ts" value (used for replies)
+        """
         response = requests.post(urljoin(url, 'chat.postMessage'), headers=headers, json={
             'channel': channel_id,
             'text': text,  # this shows in notifications when using blocks
