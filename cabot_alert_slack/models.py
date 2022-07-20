@@ -237,14 +237,11 @@ class SlackAlert(AlertPlugin):
                 user_id = self._cabot_user_to_slack_user_id(url, headers, user)
                 if user_id != IGNORE_USER_ID:
                     user_ids.append(user_id)
-            except SlackAPIError as e:
+            except (requests.HTTPError, SlackAPIError) as e:
                 missing_users.append(user)
-                if e.error_type != 'users_not_found':
+                if not (isinstance(e, SlackAPIError) and e.error_type == 'users_not_found'):
                     logger.exception('Failed to find Slack user for Cabot user %s, got unexpected error %s.',
                                      user, e.error_type)
-            except requests.HTTPError as e:
-                logger.exception('Failed to find Slack user for Cabot user %s, got unexpected HTTP error %s.',
-                                 user, e)
 
         # ensure users are in channel
         try:
@@ -265,7 +262,7 @@ class SlackAlert(AlertPlugin):
         ]
         for check in failing_checks:
             last_result = check.last_result()
-            error = last_result.error if last_result else ''
+            error = last_result.error if last_result else None  # type: Optional[str]
             check_link = build_absolute_url(reverse('check', kwargs={'pk': check.pk}))
 
             status_link = check.get_status_link()
@@ -286,7 +283,7 @@ class SlackAlert(AlertPlugin):
                     "type": "mrkdwn",
                     "text": "*<{link}|{name}>* - `{error}`".format(link=check_link,
                                                                    name=check.name.replace('>', '\\>'),
-                                                                   error=error.replace('`', '\\`'))
+                                                                   error=error.replace('`', '\\`') if error else '')
                 },
             })
 

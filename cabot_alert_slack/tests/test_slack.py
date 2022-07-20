@@ -61,22 +61,32 @@ class TestSlackAlerts(PluginTestCase):
         requests.post.assert_has_calls([
             call('https://slack.com/api/chat.postMessage', headers={'Authorization': 'Bearer SOME-TOKEN'},
                  json={
-                     'channel': 'better-channel',
+                     'channel': 'C456',
                      'text': 'Service is ERROR',
                      'blocks': [
-
+                         {'text': {'text': ':red_circle: Service status is ERROR :red_circle:', 'type': 'plain_text'},
+                          'type': 'header'},
+                         {'text': {'text': '*<http://localhost/check/10104/|ES Metric Check>* - ``', 'type': 'mrkdwn'},
+                          'type': 'section'},
+                         {
+                             'type': 'context',
+                             'elements': [{'text': '<@U123> <@Udolores@affirm.com> :point_up:', 'type': 'mrkdwn'}]
+                         }
                      ]
                  }),
             call().raise_for_status(),
         ])
-        upload_file.assert_has_calls([])
 
+    @patch('cabot_alert_slack.models.SlackAlert._email_to_slack_user_id')
     @patch('cabot_alert_slack.models.SlackAlert._post_message')
-    def test_passing_to_warning(self, post_message):
+    def test_passing_to_warning(self, post_message, email_to_uid):
+        email_to_uid.side_effect = lambda url, headers, email: ('U' + email)
+
         self.transition_service_status(Service.PASSING_STATUS, Service.WARNING_STATUS)
+
         post_message.assert_has_calls([
             call(
-                'https://slack.com/api/chat.postMessage', {'Authorization': 'Bearer SOME-TOKEN'},
+                'https://slack.com/api/', {'Authorization': 'Bearer SOME-TOKEN'},
                 text='Service is WARNING',
                 blocks=[
                     {
@@ -87,28 +97,34 @@ class TestSlackAlerts(PluginTestCase):
                         }
                     },
                     # no failing checks in this test case
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "<@U123> :point_up:"
-                            }
-                        ]
-                    },
+                    # no @mentions for warning-level
                 ],
                 channel_id='C456')
         ])
 
+    @patch('cabot_alert_slack.models.SlackAlert._email_to_slack_user_id')
     @patch('cabot_alert_slack.models.SlackAlert._post_message')
-    def test_error_to_acked(self, send_alert):
+    def test_error_to_acked(self, post_message, email_to_uid):
+        email_to_uid.side_effect = lambda url, headers, email: ('U' + email)
+
         self.transition_service_status(Service.ERROR_STATUS, Service.ACKED_STATUS)
-        send_alert.assert_has_calls([
-            call(self.service, '\n'
-                               '### Service\n'
-                               '**[Service](http://localhost/service/2194/) is reporting ACKED** :zipper_mouth_face:\n'
-                               '\n'
-                               '##### Failing checks\n', ['testuser_alias']),
+
+        post_message.assert_has_calls([
+            call(
+                'https://slack.com/api/', {'Authorization': 'Bearer SOME-TOKEN'},
+                text='Service is ACKED',
+                blocks=[
+                    {
+                        'type': 'header',
+                        'text': {
+                            'type': 'plain_text',
+                            'text': ':zipper_mouth_face: Service status is ACKED :zipper_mouth_face:',
+                        }
+                    },
+                    # no failing checks in this test case
+                    # no @mentions for acked
+                ],
+                channel_id='C456')
         ])
 
     @patch('cabot_alert_slack.models.SlackAlert._post_message')
