@@ -391,7 +391,7 @@ class SlackAlert(AlertPlugin):
 
 
 def validate_slack_user_id(slack_id):
-    if not (slack_id.startswith('U') or slack_id.startswith('W')):
+    if not (slack_id.startswith('U') or slack_id.startswith('W')) and slack_id != IGNORE_USER_ID:
         raise ValidationError('Slack user ID should start with a U or W')
 
 
@@ -402,7 +402,7 @@ class SlackAlertUserData(AlertPluginUserData):
     '''
     name = "Slack Plugin"
     slack_user_id_override = models.CharField(max_length=50, blank=True, validators=[validate_slack_user_id],
-                                              help_text="Optional override for your SLack user ID. "
+                                              help_text="Optional override for your Slack user ID. "
                                                         "You only need to set this if your Cabot email does not "
                                                         "match your Slack email. "
                                                         "Enter '" + IGNORE_USER_ID + "' to disable @mentions.")
