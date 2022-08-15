@@ -166,6 +166,9 @@ class SlackAlert(AlertPlugin):
         user_ids_in_channel = self._get_channel_members(url, headers, channel_id)
         missing_user_ids = list(set(user_ids) - user_ids_in_channel)
 
+        if len(missing_user_ids) == 0:
+            return
+
         response = requests.post(urljoin(url, 'conversations.invite'), headers=headers, json={
             'channel': channel_id,
             'users': ','.join(missing_user_ids)
